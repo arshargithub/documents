@@ -1,0 +1,292 @@
+This is a *very* good question — and the fact that you’re thinking about it this way is exactly what execs mean when they say “platform mindset”.
+
+I’m going to give you:
+
+1. A **clean mental model** for governance
+2. A **change taxonomy** that actually holds up under audit
+3. A **service + UI design** that gives business users *real* control without blowing up safety
+4. The **rationale** you can use when you need to say “no” (or “yes, but”)
+
+---
+
+# 1️⃣ First: collapse 1 and 2 conceptually (but not operationally)
+
+You asked:
+
+> Should (1) and (2) really be the same thing?
+
+**Conceptually: yes.**
+**Operationally: no.**
+
+Here’s the key distinction that makes this work:
+
+> The difference is not *who* changes things — it’s *what risk envelope* the change falls into.
+
+So instead of:
+
+* SDLC vs Git vs UI
+
+Think:
+
+* **Structural changes**
+* **Behavioral changes**
+* **Operational bindings**
+
+This framing will save you later with risk, audit, and security.
+
+---
+
+# 2️⃣ The three governance tiers (this is the core model)
+
+## Tier 1: Structural changes (high risk)
+
+**These define meaning.**
+
+Examples:
+
+* Adding a new domain
+* Adding a new intent
+* Changing extraction schema
+* Changing classification rules
+* Changing extraction strategy
+
+**Why this is high risk**
+
+* Affects correctness
+* Affects downstream systems
+* Affects model behavior
+* Can silently corrupt data
+
+### Governance model
+
+* Git-backed
+* PRs
+* Code review
+* Tests
+* Versioned
+* Audit trail
+
+👉 **This must be SDLC-grade rigor**
+No exceptions.
+
+This is your **hard line**, and you can defend it easily.
+
+---
+
+## Tier 2: Behavioral configuration (medium risk)
+
+**These affect routing, not meaning.**
+
+Examples:
+
+* Changing dispatch endpoint
+* Adding/removing Kafka topic
+* Changing retry policies
+* Changing confidence thresholds
+* Enabling/disabling an intent
+
+**Why this is medium risk**
+
+* Can break integrations
+* Can cause data loss
+* But does *not* change interpretation of data
+
+### Governance model
+
+* Git-backed
+* PRs
+* Fast approvals
+* Minimal testing
+* Potentially delegated ownership
+
+This is where **1 and 2 merge conceptually**.
+
+It’s still “configuration as code”, just lighter process.
+
+---
+
+## Tier 3: Operational bindings (low risk)
+
+**These attach the system to the real world.**
+
+Examples:
+
+* Adding a mailbox to an existing intent
+* Pausing ingestion for a mailbox
+* Updating SLA flags
+* Toggling alerts
+* Adjusting polling frequency
+
+**Why this is low risk**
+
+* Does not change intent semantics
+* Does not change extraction logic
+* Can be reverted instantly
+* Observable quickly
+
+👉 This is where a **UI is justified and safe**
+
+---
+
+# 3️⃣ The rule that makes UI changes safe
+
+Here’s the invariant you enforce:
+
+> **UI changes may only modify references, not definitions.**
+
+That single sentence is your governance shield.
+
+### Allowed via UI
+
+* Attach mailbox → intent
+* Enable / disable intent
+* Select from pre-approved dispatch endpoints
+* Adjust numeric thresholds within bounds
+
+### Not allowed via UI
+
+* Create intent
+* Edit prompt instructions
+* Edit schema
+* Edit extraction strategy
+* Free-text LLM instructions
+
+If it changes how the model *thinks*, it’s not UI-editable.
+
+---
+
+# 4️⃣ How this looks in service design terms
+
+You end up with **two configuration planes**:
+
+---
+
+## Plane A: Canonical configuration (Git)
+
+Source of truth.
+
+Contains:
+
+* Domain definitions
+* Intent definitions
+* Schemas
+* Prompts
+* Strategy references
+
+Properties:
+
+* Versioned
+* Reviewed
+* Immutable at runtime
+* Auditable
+
+---
+
+## Plane B: Runtime bindings (DB / config service)
+
+Mutable, UI-backed.
+
+Contains:
+
+* Mailbox → domain mappings
+* Mailbox → intent enablement
+* Dispatch endpoint selection (from allowlist)
+* Feature flags
+* Rate limits
+
+Properties:
+
+* Guardrails
+* Validation
+* RBAC
+* Reversible
+* Logged
+
+---
+
+## The runtime system merges both
+
+At runtime:
+
+1. Load canonical config (Git → registry)
+2. Load bindings (DB / config service)
+3. Resolve effective configuration
+
+This pattern is extremely well understood in large platforms.
+
+---
+
+# 5️⃣ What the UI actually shows (important)
+
+### For business users
+
+* Read-only view of:
+
+  * Domains
+  * Intents
+  * What data is extracted
+* Editable:
+
+  * Mailboxes
+  * Enable/disable
+  * Dispatch targets (dropdown)
+  * SLAs
+
+### For platform admins
+
+* Everything business sees
+* Plus:
+
+  * Promote config versions
+  * Rollbacks
+  * Shadow / dry-run modes
+
+---
+
+# 6️⃣ How to explain this to business (script you can use)
+
+Here’s a clean, non-technical explanation:
+
+> “There are changes that affect *what the system means*, and changes that affect *where the data goes*. We’re giving you control over the second category in real time, but the first category needs rigor because mistakes there silently corrupt data.”
+
+If you want to sound even stronger:
+
+> “Anything that changes interpretation goes through review. Anything that changes routing can be done safely in the UI.”
+
+This usually lands very well.
+
+---
+
+# 7️⃣ Why letting business edit intents directly is dangerous (rationale)
+
+Use these points if you need to push back:
+
+* LLM behavior changes are non-linear
+* Small prompt edits can cause large extraction drift
+* Errors propagate silently downstream
+* Audit & explainability are lost
+* Rollback is ambiguous (“what changed?”)
+
+This is not theoretical — this is where AI platforms get burned.
+
+---
+
+# 8️⃣ Final mental model (memorize this)
+
+> **Definitions are code. Bindings are configuration. Operations are UI.**
+
+If you hold that line, you can:
+
+* Empower business users
+* Stay safe
+* Pass audit
+* Scale across domains
+
+If you want next, I can:
+
+* Sketch the UI screens
+* Define RBAC roles
+* Design a config service schema
+* Or help you turn this into a 1-slide governance story for execs
+
+This is *exactly* the right conversation to be having at this stage.
